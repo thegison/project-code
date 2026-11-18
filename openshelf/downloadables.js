@@ -18,6 +18,17 @@
   const licenseFilter = document.getElementById('licenseFilter');
   const sortOrder = document.getElementById('sortOrder');
   const resetTools = document.getElementById('resetTools');
+  const publishForm = document.getElementById('publishForm');
+  const publishTitle = document.getElementById('publishTitle');
+  const publishDescription = document.getElementById('publishDescription');
+  const publishCredit = document.getElementById('publishCredit');
+  const publishFilesInput = document.getElementById('publishFiles');
+  const publishDropzone = document.getElementById('publishDropzone');
+  const choosePublishFiles = document.getElementById('choosePublishFiles');
+  const publishFileList = document.getElementById('publishFileList');
+  const publishRights = document.getElementById('publishRights');
+  const publishButton = document.getElementById('publishButton');
+  const publishStatus = document.getElementById('publishStatus');
   const categoryButtons = [...document.querySelectorAll('.category-button')];
   const categories = {
     all: { label: 'Everything', search: '', matches: () => true },
@@ -33,6 +44,11 @@
   let isDownloading = false;
   let activeCategory = 'all';
   let searchResults = [];
+  let isPublishing = false;
+  const publishFiles = [];
+  const MAX_PUBLISH_FILES = 20;
+  const MAX_PUBLISH_FILE_BYTES = 35 * 1024 * 1024;
+  const MAX_PUBLISH_BYTES = 75 * 1024 * 1024;
 
   function plainText(value) {
     if (!value) return '';
@@ -48,6 +64,204 @@
 
   function safeFileName(name) {
     return name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/[. ]+$/g, '').slice(0, 180) || 'download';
+  }
+
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
+  }
+
+  function setPublishStatus(message, type = '') {
+    publishStatus.textContent = message;
+    publishStatus.className = `publish-status${type ? ` ${type}` : ''}`;
+  }
+
+  function totalPublishBytes() {
+    return publishFiles.reduce((sum, file) => sum + file.size, 0);
+  }
+
+  function renderPublishFiles() {
+    publishFileList.replaceChildren();
+    publishTitle.disabled = isPublishing;
+    publishDescription.disabled = isPublishing;
+    publishCredit.disabled = isPublishing;
+    publishRights.disabled = isPublishing;
+    publishFilesInput.disabled = isPublishing;
+    publishFiles.forEach((file, index) => {
+      const row = document.createElement('li');
+      row.className = 'publish-file-row';
+      const name = document.createElement('span');
+      name.className = 'publish-file-name';
+      name.textContent = file.name;
+      name.title = file.name;
+      const size = document.createElement('span');
+      size.className = 'publish-file-size';
+      size.textContent = formatBytes(file.size);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove-publish-file';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', `Remove ${file.name}`);
+      remove.disabled = isPublishing;
+      remove.addEventListener('click', () => {
+        publishFiles.splice(index, 1);
+        renderPublishFiles();
+        setPublishStatus(publishFiles.length
+          ? `${publishFiles.length} ${publishFiles.length === 1 ? 'file' : 'files'} selected · ${formatBytes(totalPublishBytes())} of 75 MB.`
+          : 'Your files stay on this device. Choose files to create a publish-ready website ZIP.');
+      });
+      row.append(name, size, remove);
+      publishFileList.append(row);
+    });
+
+    publishButton.disabled = isPublishing || !publishFiles.length || !publishRights.checked || !publishTitle.value.trim();
+    choosePublishFiles.disabled = isPublishing || publishFiles.length >= MAX_PUBLISH_FILES;
+  }
+
+  function addPublishFiles(fileList) {
+    const existing = new Set(publishFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+    const rejected = [];
+    for (const file of fileList) {
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (existing.has(key)) continue;
+      if (file.size > MAX_PUBLISH_FILE_BYTES) {
+        rejected.push(`${file.name} is over 35 MB`);
+        continue;
+      }
+      if (publishFiles.length >= MAX_PUBLISH_FILES) {
+        rejected.push(`Only ${MAX_PUBLISH_FILES} files can be added`);
+        break;
+      }
+      if (totalPublishBytes() + file.size > MAX_PUBLISH_BYTES) {
+        rejected.push('The 75 MB total size limit would be exceeded');
+        break;
+      }
+      publishFiles.push(file);
+      existing.add(key);
+    }
+
+    renderPublishFiles();
+    if (rejected.length) {
+      setPublishStatus(`${rejected.join('. ')}. Remove a file or choose smaller files to continue.`, 'error');
+    } else if (publishFiles.length) {
+      setPublishStatus(`${publishFiles.length} ${publishFiles.length === 1 ? 'file' : 'files'} selected · ${formatBytes(totalPublishBytes())} of 75 MB.`);
+    }
+  }
+
+  function getUniquePublishNames(files) {
+    const used = new Set();
+    return files.map((file) => {
+      const base = safeFileName(file.name);
+      const extensionIndex = base.lastIndexOf('.');
+      const stem = extensionIndex > 0 ? base.slice(0, extensionIndex) : base;
+      const extension = extensionIndex > 0 ? base.slice(extensionIndex) : '';
+      let candidate = base;
+      let suffix = 2;
+      while (used.has(candidate.toLowerCase())) {
+        candidate = `${stem} (${suffix})${extension}`;
+        suffix += 1;
+      }
+      used.add(candidate.toLowerCase());
+      return candidate;
+    });
+  }
+
+  function createPublishedPage(title, description, credit, files, names) {
+    const cards = files.map((file, index) => {
+      const safeHref = escapeHTML(`files/${encodeURIComponent(names[index])}`);
+      const safeName = escapeHTML(file.name);
+      const safeMime = escapeHTML(file.type || '');
+      let preview;
+      if (file.type.startsWith('image/')) {
+        preview = `<img src="${safeHref}" alt="${safeName}" loading="lazy">`;
+      } else if (file.type.startsWith('audio/')) {
+        preview = `<audio controls preload="metadata" src="${safeHref}">Your browser does not support audio playback.</audio>`;
+      } else if (file.type.startsWith('video/')) {
+        preview = `<video controls preload="metadata" src="${safeHref}">Your browser does not support video playback.</video>`;
+      } else {
+        preview = '<div class="file-icon" aria-hidden="true">↧</div>';
+      }
+      const type = safeMime ? ` · ${safeMime}` : '';
+      return `<article class="card"><div class="preview">${preview}</div><div class="details"><h2>${safeName}</h2><p>${escapeHTML(formatBytes(file.size))}${type}</p><a class="download" href="${safeHref}" download="${escapeHTML(names[index])}">Download file <span aria-hidden="true">↓</span></a></div></article>`;
+    }).join('\n');
+
+    return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="${escapeHTML(description || 'A collection of files shared with care.')}">
+  <meta name="theme-color" content="#101110">
+  <title>${escapeHTML(title)}</title>
+  <style>
+    :root{color-scheme:dark;--bg:#101110;--panel:#1a1c1a;--ink:#f1eee7;--muted:#a4a59e;--accent:#e16a45;--line:#343632;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink)}header,main,footer{width:min(1040px,calc(100% - 36px));margin:auto}
+    header{padding:64px 0 34px;border-bottom:1px solid var(--line)}.eyebrow{margin:0 0 10px;color:#f19a79;font:500 11px ui-monospace,monospace;letter-spacing:1.6px;text-transform:uppercase}
+    h1{margin:0;font:600 clamp(36px,7vw,64px)/1.08 Georgia,serif;letter-spacing:-1.5px}header p:last-child{max-width:620px;margin:17px 0 0;color:#c1c6be;font-size:16px;line-height:1.7}
+    main{padding:30px 0 56px}.count{margin:0 0 17px;color:var(--muted);font-size:12px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+    .card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--panel)}.preview{display:grid;min-height:180px;place-items:center;overflow:hidden;background:#222522}
+    .preview img,.preview video{display:block;width:100%;max-height:360px;object-fit:contain}.preview audio{width:calc(100% - 26px)}.file-icon{color:#f19a79;font-size:48px}
+    .details{padding:14px}.details h2{overflow-wrap:anywhere;margin:0 0 7px;font-size:14px}.details p{margin:0 0 13px;color:var(--muted);font-size:11px}
+    .download{display:flex;justify-content:space-between;align-items:center;padding:10px 11px;border-radius:4px;background:var(--accent);color:white;font-size:12px;font-weight:600;text-decoration:none}.download:hover{background:#bd4d30}
+    footer{padding:18px 0 28px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.6}footer strong{color:#d5d4cb}
+    @media(max-width:520px){header{padding-top:42px}.grid{grid-template-columns:1fr}.preview{min-height:160px}}
+  </style>
+</head>
+<body>
+  <header><p class="eyebrow">A collection, shared</p><h1>${escapeHTML(title)}</h1><p>${escapeHTML(description || 'A collection of files shared with care.')}</p></header>
+  <main><p class="count">${files.length} ${files.length === 1 ? 'file' : 'files'} in this collection</p><div class="grid">${cards}</div></main>
+  <footer><strong>Credits &amp; permissions</strong><br>${escapeHTML(credit || 'Shared by the collection creator.')}</footer>
+</body>
+</html>`;
+  }
+
+  async function publishFilesAsWebsite() {
+    if (!window.JSZip) {
+      setPublishStatus('The ZIP library did not load. Check your connection and refresh the page.', 'error');
+      return;
+    }
+    if (!publishFiles.length || !publishRights.checked || !publishTitle.value.trim()) {
+      renderPublishFiles();
+      setPublishStatus('Add files, enter a website title, and confirm you have permission to publish them.', 'error');
+      return;
+    }
+
+    isPublishing = true;
+    renderPublishFiles();
+    publishButton.textContent = 'Building your website…';
+    setPublishStatus('Packing your files into a publish-ready website…');
+    try {
+      const zip = new window.JSZip();
+      const files = [...publishFiles];
+      const names = getUniquePublishNames(files);
+      files.forEach((file, index) => zip.file(`files/${names[index]}`, file));
+      zip.file('index.html', createPublishedPage(
+        publishTitle.value.trim(),
+        publishDescription.value.trim(),
+        publishCredit.value.trim(),
+        files,
+        names
+      ));
+      zip.file('README.txt', `PUBLISHING THIS WEBSITE\n\n1. Extract this ZIP on your computer.\n2. Create a new GitHub repository (or open an existing one).\n3. Upload index.html and the entire files folder to the repository's main/root folder.\n4. Open repository Settings > Pages.\n5. Choose "Deploy from a branch", select your main branch and the /(root) folder, then save.\n6. Wait for GitHub Pages to publish. The website address will appear in Settings > Pages.\n\nKeep index.html and the files folder together. The website is static and needs no build step or backend.\n\nMake sure you have permission to publish every file and include any required credits or license information.`);
+      const blob = await zip.generateAsync(
+        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 5 } },
+        (progress) => setPublishStatus(`Building your website ZIP… ${Math.round(progress.percent)}%`)
+      );
+      const baseName = safeFileName(publishTitle.value.trim()).replace(/\.[^.]+$/, '').replace(/\s+/g, '-').toLowerCase();
+      triggerDownload(blob, `${baseName || 'my-collection'}-website.zip`);
+      setPublishStatus('Your website ZIP is ready. Extract it, then follow README.txt to publish with GitHub Pages.', 'success');
+    } catch (error) {
+      setPublishStatus(`Could not build the website ZIP: ${error.message}`, 'error');
+    } finally {
+      isPublishing = false;
+      publishButton.innerHTML = 'Build my website <span aria-hidden="true">↗</span>';
+      renderPublishFiles();
+    }
   }
 
   function setStatus(message, type = '') {
@@ -516,7 +730,31 @@
     setStatus('');
     renderSelected();
   });
+  choosePublishFiles.addEventListener('click', () => publishFilesInput.click());
+  publishFilesInput.addEventListener('change', () => {
+    addPublishFiles(publishFilesInput.files);
+    publishFilesInput.value = '';
+  });
+  publishDropzone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    publishDropzone.classList.add('is-dragging');
+  });
+  publishDropzone.addEventListener('dragleave', (event) => {
+    if (!publishDropzone.contains(event.relatedTarget)) publishDropzone.classList.remove('is-dragging');
+  });
+  publishDropzone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    publishDropzone.classList.remove('is-dragging');
+    addPublishFiles(event.dataTransfer.files);
+  });
+  publishRights.addEventListener('change', renderPublishFiles);
+  publishTitle.addEventListener('input', renderPublishFiles);
+  publishForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    publishFilesAsWebsite();
+  });
 
+  renderPublishFiles();
   renderSelected();
   const urlParams = new URLSearchParams(window.location.search);
   const requestedCategory = urlParams.get('category');
