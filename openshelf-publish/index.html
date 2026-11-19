@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101110" />
+    <meta
+      name="description"
+      content="Find freely licensed and public-domain downloads, then bundle them into a ZIP right in your browser."
+    />
+    <title>OpenShelf — find it. bundle it.</title>
+    <link rel="preconnect" href="https://commons.wikimedia.org" />
+    <link rel="preconnect" href="https://upload.wikimedia.org" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script defer src="downloadables.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="OpenShelf home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>openshelf<span class="brand-period">.</span></span>
+        </a>
+        <span class="privacy-note"><span class="privacy-dot"></span> Open media, ready to take home</span>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="sparkle" aria-hidden="true">✳</span> THE OPEN MEDIA MARKET</p>
+            <h1 id="page-title">A world of<br /><span>good finds.</span></h1>
+            <p class="hero-intro">
+              Art, sounds, photos and more — all free to explore. Pick a category, gather your favorites, and take them with you.
+            </p>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <span class="art-orbit orbit-one"></span>
+            <span class="art-orbit orbit-two"></span>
+            <span class="art-disc">OPEN<br />&nbsp;&nbsp;SHELF</span>
+            <span class="art-spark art-spark-one">✳</span>
+            <span class="art-spark art-spark-two">✦</span>
+            <span class="hero-side-note">A LITTLE<br />CURIOSITY<br />GOES A LONG WAY</span>
+          </div>
+        </section>
+
+        <section class="publish-section" aria-labelledby="publishHeading">
+          <div class="publish-intro">
+            <p class="eyebrow">YOUR OWN LITTLE CORNER OF THE WEB</p>
+            <h2 id="publishHeading">Publish your files</h2>
+            <p>Turn your photos, art, audio, or other work into a small website you can publish on GitHub Pages. Everything is packed on your device.</p>
+          </div>
+          <form id="publishForm" class="publish-form">
+            <div class="publish-fields">
+              <label class="publish-field">
+                <span>Website title</span>
+                <input id="publishTitle" type="text" maxlength="60" value="My OpenShelf Collection" required />
+              </label>
+              <label class="publish-field">
+                <span>A short introduction <small>optional</small></span>
+                <textarea id="publishDescription" rows="2" maxlength="240" placeholder="What would you like visitors to know?"></textarea>
+              </label>
+              <label class="publish-field">
+                <span>Credit or license <small>optional</small></span>
+                <input id="publishCredit" type="text" maxlength="160" placeholder="e.g. Made by Alex · CC BY 4.0" />
+              </label>
+            </div>
+
+            <input id="publishFiles" class="visually-hidden" type="file" multiple />
+            <div id="publishDropzone" class="publish-dropzone">
+              <span class="dropzone-icon" aria-hidden="true">↑</span>
+              <div>
+                <strong>Drop your files here</strong>
+                <p>Images, audio, video, PDFs, and more · up to 20 files / 75 MB total</p>
+              </div>
+              <button id="choosePublishFiles" class="choose-files" type="button">Choose files</button>
+            </div>
+            <ul id="publishFileList" class="publish-file-list" aria-label="Files to publish"></ul>
+
+            <div class="publish-bottom">
+              <label class="rights-check">
+                <input id="publishRights" type="checkbox" />
+                <span>I have permission to publish these files and any required credits are included.</span>
+              </label>
+              <button id="publishButton" class="publish-button" type="submit" disabled>
+                Build my website <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+            <p id="publishStatus" class="publish-status" role="status" aria-live="polite">
+              Your files stay on this device. Open the ZIP instructions to publish it using GitHub Pages.
+            </p>
+          </form>
+        </section>
+
+        <div class="catalog-layout">
+          <aside class="category-rail" aria-label="Browse categories">
+            <p class="eyebrow category-label">BROWSE THE SHELF</p>
+            <nav id="categoryNav" class="category-nav" aria-label="Media categories">
+              <button type="button" class="category-button is-active" data-category="all" aria-pressed="true"><span class="category-icon">✳</span> Everything <span class="category-arrow">↗</span></button>
+              <button type="button" class="category-button" data-category="photography" aria-pressed="false"><span class="category-icon">▧</span> Photography</button>
+              <button type="button" class="category-button" data-category="illustration" aria-pressed="false"><span class="category-icon">✿</span> Art &amp; illustration</button>
+              <button type="button" class="category-button" data-category="audio" aria-pressed="false"><span class="category-icon">♫</span> Audio</button>
+              <button type="button" class="category-button" data-category="video" aria-pressed="false"><span class="category-icon">▶</span> Video</button>
+              <button type="button" class="category-button" data-category="maps" aria-pressed="false"><span class="category-icon">⌖</span> Maps &amp; documents</button>
+            </nav>
+            <div class="rail-note"><span class="rail-note-mark">✳</span><p>Made for curious people and the things they make.</p></div>
+          </aside>
+
+          <div class="catalog-content">
+            <section class="search-panel" aria-label="Search downloadable files">
+              <form id="searchForm" class="search-form">
+                <label class="visually-hidden" for="searchInput">Search Wikimedia Commons</label>
+                <span class="search-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.2 4.2"></path></svg>
+                </span>
+                <input id="searchInput" type="search" placeholder="Try “vintage botanical illustration”" autocomplete="off" required />
+                <button class="search-button" type="submit">Search <span aria-hidden="true">↗</span></button>
+              </form>
+              <div class="search-bottom">
+                <span class="quick-label">TRY THESE</span>
+                <div class="quick-searches" aria-label="Popular searches">
+                  <button type="button" class="query-chip" data-query="space">✦ Space</button>
+                  <button type="button" class="query-chip" data-query="botanical">❋ Botanical</button>
+                  <button type="button" class="query-chip" data-query="vintage maps">⌁ Old maps</button>
+                  <button type="button" class="query-chip" data-query="jazz">♫ Jazz</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="results-section" aria-labelledby="resultsHeading">
+              <div class="results-heading">
+                <div>
+                  <p class="eyebrow results-eyebrow">THE DISCOVERY SHELF</p>
+                  <h2 id="resultsHeading">A little inspiration</h2>
+                </div>
+                <p id="resultCount" class="result-count"></p>
+              </div>
+              <div class="results-tools" aria-label="Filter and sort results">
+                <label class="tool-control">
+                  <span>License</span>
+                  <select id="licenseFilter" aria-label="Filter by license">
+                    <option value="all">Any license</option>
+                    <option value="reuse">Public domain &amp; CC0</option>
+                    <option value="attribution">Attribution required</option>
+                    <option value="sharealike">Share alike</option>
+                  </select>
+                </label>
+                <label class="tool-control">
+                  <span>Sort by</span>
+                  <select id="sortOrder" aria-label="Sort results">
+                    <option value="relevance">Relevance</option>
+                    <option value="largest">Largest file</option>
+                    <option value="smallest">Smallest file</option>
+                    <option value="title">Title A–Z</option>
+                  </select>
+                </label>
+                <button id="resetTools" class="reset-tools" type="button" hidden>Reset</button>
+              </div>
+
+              <div id="statusMessage" class="status-message" role="status" aria-live="polite">
+                Searching the Commons collection…
+              </div>
+              <div id="resultsGrid" class="results-grid" aria-busy="true"></div>
+            </section>
+          </div>
+        </div>
+
+        <section id="bundlePanel" class="bundle-panel" aria-labelledby="bundleHeading">
+          <div class="bundle-icon" aria-hidden="true">▧</div>
+          <div class="bundle-copy">
+            <p class="eyebrow">YOUR DOWNLOAD BUNDLE</p>
+            <h2 id="bundleHeading">Nothing in your bundle yet</h2>
+            <p id="bundleHint">Add a few finds from the shelf and they’ll be packed into one ZIP.</p>
+          </div>
+          <div class="bundle-actions">
+            <button id="clearButton" class="clear-button" type="button" disabled>Clear</button>
+            <span id="bundleSize" class="bundle-size">0 files · 80 MB max</span>
+            <button id="zipButton" class="zip-button" type="button" disabled>
+              <span aria-hidden="true">↓</span> Make my ZIP
+            </button>
+          </div>
+          <ul id="selectedList" class="selected-list" aria-label="Files in your bundle"></ul>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <p>OpenShelf searches <a href="https://commons.wikimedia.org/" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a> — a library of freely licensed and public-domain media.</p>
+        <p>Your ZIP is made on your device. <span>No files are sent to a server.</span></p>
+      </footer>
+    </div>
+  </body>
+</html>
